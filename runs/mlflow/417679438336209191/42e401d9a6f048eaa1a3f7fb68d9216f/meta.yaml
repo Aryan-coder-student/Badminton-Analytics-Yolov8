@@ -1,0 +1,15 @@
+artifact_uri: file:///F:/My File/P.E.2/Badminton-Analytics-Yolov8/runs/mlflow/417679438336209191/42e401d9a6f048eaa1a3f7fb68d9216f/artifacts
+end_time: 1743167604434
+entry_point_name: ''
+experiment_id: '417679438336209191'
+lifecycle_stage: active
+run_id: 42e401d9a6f048eaa1a3f7fb68d9216f
+run_name: yolov8n_custom
+run_uuid: 42e401d9a6f048eaa1a3f7fb68d9216f
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1743167229067
+status: 3
+tags: []
+user_id: ASUS

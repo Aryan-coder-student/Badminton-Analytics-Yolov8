@@ -1,0 +1,14 @@
+train: F:\My File\P.E.2\Badminton-Analytics-Yolov8\data\badminton.v29-version29.yolov11\train\images
+val: F:\My File\P.E.2\Badminton-Analytics-Yolov8\data\badminton.v29-version29.yolov11\valid\images
+
+test: F:\My File\P.E.2\Badminton-Analytics-Yolov8\data\badminton.v29-version29.yolov11\test\images
+
+nc: 2
+names: ['15', 'shuttlecock']
+
+roboflow:
+  workspace: riyaznizar1997-gmail-com
+  project: badminton-rf5tk
+  version: 29
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/riyaznizar1997-gmail-com/badminton-rf5tk/dataset/29

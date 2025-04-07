@@ -1,0 +1,13 @@
+train: F:/My File/P.E.2/Badminton-Analytics-Yolov8/data/badminton.v1i.yolov8/train/images
+val: F:/My File/P.E.2/Badminton-Analytics-Yolov8/data/badminton.v1i.yolov8/valid/images
+
+
+nc: 2
+names: ['player', 'referee']
+
+roboflow:
+  workspace: kidney-stone-detectionv2iflorence2od
+  project: badminton-8yfm2
+  version: 1
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/kidney-stone-detectionv2iflorence2od/badminton-8yfm2/dataset/1
