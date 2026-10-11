@@ -232,7 +232,7 @@ def save_contact_sheets(
         rows = (len(group) + columns - 1) // columns
         canvas = np.full((rows * tile_h, columns * tile_w, 3), 240, dtype=np.uint8)
         for n, sample in enumerate(group):
-            filename = f"frame_{int(sample['frame_index']):08d}.jpg"
+            filename = f"frame_{int(sample['frame_index']):08d}.png"
             frame = cv2.imread(str(image_directory / filename))
             if frame is None:
                 raise ValueError(f"Missing extracted image for review: {filename}")
