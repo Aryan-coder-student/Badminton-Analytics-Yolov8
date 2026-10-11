@@ -1,0 +1,148 @@
+# Run the BFMD match preparation pipeline
+
+## Inputs and source rights
+
+BFMD is a CVPR 2026 workshop full-match badminton dataset. Download its
+**annotation package** from the [official BFMD repository](https://github.com/Ning-D/BFMD).
+The published data package has 12 singles and 7 doubles broadcast matches.
+It **does not redistribute the actual videos** for copyright reasons. Follow
+the provider's `BFMD_data/download_youtube.py --list` and `--match` instructions
+to obtain the relevant official BWF TV source locally, subject to rights and
+platform terms. Never commit or redistribute those recordings.
+
+The root is expected to look like this:
+
+```text
+BFMD_data/
+  download_youtube.py
+  videos/<tournament>/<match>.mp4       # singles
+  videos_doubles/<match>.mp4             # doubles
+  annotations/
+    court_perframe/<match>.json          # optional 1-Hz court hints
+    pose/<match>.json                    # optional singles pose-box prelabels
+```
+
+**Important**: BFMD documents video frame coordinates as **zero-based** and
+annotations aligned to **1280x720 at 30 fps**. Do not silently resize,
+trim, change FPS, or remux with frame dropping. This script refuses mismatched
+video dimensions/timing by default. Override only for exploratory clustering,
+with BFMD frame/box/court annotations disabled.
+
+## Main pipeline
+
+```text
+Official BFMD match MP4
+   |
+   +--> TransNetV2 shot-boundary detector --> camera-shot [start,end) frames
+   |                                             |
+   |                       sample at 25%, 50%, 75% of each shot
+   |                                             |
+   |                        existing DINOv2 image embedding
+   |                                             |
+   |                        mean embedding for each camera shot
+   |                                             |
+   |                        existing KMeans visual clustering
+   |                                             |
+   |                   review cluster contact sheets and map views
+   |                                             |
+   +--> sampled original full-size frames for box/mask annotation
+   |
+   +--> optional BFMD court_perframe hints --> court ROI *previews only*
+   |
+   +--> optional BFMD singles pose boxes --> unverified prelabels only
+```
+
+**Do not crop to the court before DINOv2 clustering.** The goal of these
+embeddings is to separate *camera views*, for which scoreboard, zoom, player,
+and wider scene context are useful. The court ROI is used as a later
+*preview/diagnostic* for court-player filtering; it is never substituted for the
+original 1280x720 frame in the benchmark.
+
+## Run
+
+From the repository root:
+
+```bash
+uv sync
+python BFMD_data/download_youtube.py --list
+python BFMD_data/download_youtube.py --match "<unique-match-fragment>"
+
+uv run python scripts/prepare_bfmd.py \
+  --bfmd-root BFMD_data \
+  --match "<unique-match-fragment>" \
+  --transnet-weights /path/to/transnetv2-pytorch-weights.pth \
+  --clusters 6 \
+  --frames 150
+```
+
+The weights are the appropriate pretrained TransNetV2 PyTorch state dict;
+do not supply the DINOv2 or YOLO checkpoint. The `transnetv2-pytorch==1.0.5`
+package's documented `detect_scenes` method is used with `threshold=0.5`
+(default). It returns inclusive end indices; we explicitly normalize to
+`[start_frame,end_frame)` for this repository.
+
+**Already have shot boundaries?** Reuse them instead of rerunning TransNetV2:
+
+```bash
+uv run python scripts/prepare_bfmd.py \
+  --bfmd-root BFMD_data \
+  --match "<unique-match-fragment>" \
+  --shot-ranges data/benchmark/my_shot_ranges.csv \
+  --frames 150
+```
+
+The CSV must have `shot_id,start_frame,end_frame` with **end exclusive**
+and absolute video frame indices.
+
+For a smoke test use `--max-shots 12 --clusters 3 --frames 20`.
+Rerun with `--reembed` when input shots/video or embedding setup changes,
+and `--redetect` to replace cached boundaries. Avoid reusing an output
+directory between different videos.
+
+## Output
+
+```text
+data/benchmark/bfmd/<match>/
+  shot_ranges.csv                  # TransNetV2, end exclusive
+  shot_embeddings.npz              # 25/50/75 samples + DINOv2 means
+  shot_clusters.csv                # labels + exact shot/sample provenance
+  cluster_camera_views.json        # all needs_review until inspected
+  candidate_frames.csv             # selected frame paths, shot/cluster, court hint
+  images/frame_XXXXXXXX.jpg        # full original frames for manual labels
+  court_roi_previews/              # only when time-nearby usable court corners
+  cluster_review/cluster_XX.jpg    # contact sheets for reviewing clusters
+  annotations_PRELABELS_NOT_GROUND_TRUTH.json
+  summary.json
+```
+
+BFMD's `court_perframe` flags are **valid/refit/no_court**. This script uses
+only a nearby observation (within 15 source frames), and only valid/refit
+corners may produce an ROI preview; the hint is not certified frame-exact
+geometry, especially if a camera cut occurs between samples.
+
+For singles, BFMD may have per-rally pose-detection bounding boxes;
+these are copied as **unreviewed prelabels** when present. For doubles,
+the released BFMD package does not provide matching four-player
+bounding-box/mask annotations: those must be created manually.
+Empty `players` in this preparation artifact means *unlabelled*, **not**
+that zero players are present. Never use this JSON directly as benchmark ground
+truth or report model accuracy against it.
+
+Review cluster contact sheets and replace
+`cluster_camera_views.json` values with actual semantic labels
+(`wide`, `partial_court`, `closeup`, `side_angle`, `transition`,
+`other`, `needs_review`). For any visually mixed cluster, use per-shot
+overrides using the command described in
+[shot-camera-view-clustering.md](shot-camera-view-clustering.md).
+
+Then manually correct player boxes and draw segmentation masks in your
+annotation tool, separately maintain a shot-held-out validation set, and
+use the existing `evaluation.cli evaluate` command. Without that manual
+verification, **Milestone 1 detector accuracy cannot be claimed**.
+
+## Status
+
+This PR contains an executable adapter with pure data handling tests.
+The real BFMD match inference has **not** been executed here: neither the
+copyrighted source MP4, downloaded BFMD annotation package, nor pretrained
+TransNetV2/DINOv2 weights are present in the working environment.
