@@ -119,6 +119,40 @@ def _apply_camera_views(args: argparse.Namespace) -> None:
     print(f"Tagged {len(enriched['frames'])} frames using reviewed shot clusters")
 
 
+def _embed_shots(args: argparse.Namespace) -> None:
+    """Run existing DINOv2 on three percentile samples from each shot."""
+    from badminton_analysis.evaluation.shot_clustering import (
+        extract_shot_embeddings,
+        load_shot_ranges,
+        save_embedding_cache,
+    )
+    from badminton_analysis.model.embeddings import Embedding
+
+    shots = load_shot_ranges(args.shot_ranges)
+    embeddings, sample_indices = extract_shot_embeddings(
+        args.video, shots, Embedding("dinov2")
+    )
+    save_embedding_cache(args.output, shots, embeddings, sample_indices)
+    print(f"Saved {len(shots)} shot embeddings to {args.output}")
+
+
+def _cluster_shots(args: argparse.Namespace) -> None:
+    """Cluster existing cached shot embeddings without rerunning DINOv2."""
+    from badminton_analysis.evaluation.shot_clustering import (
+        group_shots,
+        load_embedding_cache,
+        write_shot_clusters,
+    )
+
+    shots, embeddings, sample_indices = load_embedding_cache(args.cache)
+    labels, silhouette = group_shots(embeddings, args.clusters)
+    write_shot_clusters(args.output, shots, labels, sample_indices)
+    print(
+        f"Saved {len(shots)} clustered shot ranges to {args.output}; "
+        f"silhouette={silhouette if silhouette is not None else 'not-defined'}"
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     subcommands = parser.add_subparsers(dest="command", required=True)
@@ -164,6 +198,24 @@ def main() -> None:
     apply_views.add_argument("--annotations", type=Path, required=True)
     apply_views.add_argument("--output", type=Path, required=True)
     apply_views.set_defaults(handler=_apply_camera_views)
+
+    embed = subcommands.add_parser(
+        "embed-shots",
+        help="Sample 25/50/75% frames from TransNetV2 shot ranges and cache DINOv2",
+    )
+    embed.add_argument("--video", type=Path, required=True)
+    embed.add_argument("--shot-ranges", type=Path, required=True)
+    embed.add_argument("--output", type=Path, required=True)
+    embed.set_defaults(handler=_embed_shots)
+
+    cluster = subcommands.add_parser(
+        "cluster-shots",
+        help="Run the existing KMeans strategy on cached shot-level embeddings",
+    )
+    cluster.add_argument("--cache", type=Path, required=True)
+    cluster.add_argument("--clusters", type=int, default=6)
+    cluster.add_argument("--output", type=Path, required=True)
+    cluster.set_defaults(handler=_cluster_shots)
 
     args = parser.parse_args()
     args.handler(args)
