@@ -13,6 +13,7 @@ dependencies = [
     "lap>=0.5.12",
     "opencv-python>=5.0.0.93",
     "pillow>=11.0.0",
+    "pycocotools>=2.0.10",
     "pydantic-settings>=2.10.0",
     "scikit-learn>=1.8.0",
     "tensorflow>=2.21.0",
