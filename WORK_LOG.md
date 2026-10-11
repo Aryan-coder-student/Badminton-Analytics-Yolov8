@@ -1,5 +1,27 @@
 # Project Work Log
 
+## 2026-10-11 — BFMD full-match adapter for Milestone 1
+
+- Added `scripts/prepare_bfmd.py` and `evaluation/bfmd.py` to use official
+  BFMD single/doubles match paths while keeping copyrighted BWF TV videos
+  and downloaded dataset annotations outside Git.
+- The runner can detect scene cuts through `transnetv2-pytorch==1.0.5`
+  using provided pretrained weights, or reuse the existing TransNetV2
+  shot-range CSV and cached DINOv2 embeddings. It runs the already-existing
+  shot-level KMeans workflow and exports grouped contact sheets.
+- Added candidate selection distributed across clusters and the match,
+  prioritizing distinct camera shots; a shot-disjoint holdout split prevents
+  adjacent frames from the same shot leaking into both splits. Select
+  reviewed camera views with optional repeated `--camera-view` flags.
+- Frames are exported losslessly as PNG. BFMD court-per-frame hints create
+  optional **ROI previews** only, never cropped input to view embeddings.
+  Optional BFMD singles pose boxes are copied only as unverified prelabels;
+  doubles frames have no assumed player ground truth. No mask accuracy
+  or actual camera-view accuracy has been claimed.
+- Added synthetic-input and dataset-helper test cases and a BFMD runbook.
+  Real BFMD video/weights, actual full-match inference and the combined
+  test suite remain unverified in this environment.
+
 ## 2026-10-11 — Reuse shot-cut extraction and visual clustering for camera-view prelabels
 
 - Confirmed the existing camera-shot pipeline: TransNetV2 boundaries, 25/50/75%
