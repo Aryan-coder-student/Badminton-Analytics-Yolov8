@@ -9,6 +9,7 @@ on:
       - 'tests/test_bfmd.py'
       - 'tests/test_camera_views.py'
       - 'tests/test_cvat_export.py'
+      - 'tests/test_cvat_import.py'
       - 'tests/test_player_evaluation.py'
       - 'tests/test_shot_clustering.py'
   push:
@@ -39,4 +40,5 @@ jobs:
             tests/test_camera_views.py \
             tests/test_shot_clustering.py \
             tests/test_bfmd.py \
-            tests/test_cvat_export.py
+            tests/test_cvat_export.py \
+            tests/test_cvat_import.py
