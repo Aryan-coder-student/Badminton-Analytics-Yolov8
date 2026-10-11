@@ -95,7 +95,7 @@ def _camera_view_template(args: argparse.Namespace) -> None:
 
     template = camera_view_template(load_shot_clusters(args.shot_clusters))
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(template, indent=2) + "\\n", encoding="utf-8")
+    args.output.write_text(json.dumps(template, indent=2) + "\n", encoding="utf-8")
     print(f"Review the camera views for {len(template)} visual clusters: {args.output}")
 
 
@@ -115,7 +115,7 @@ def _apply_camera_views(args: argparse.Namespace) -> None:
     cluster_ids = {str(shot["cluster_id"]) for shot in shots}
     mapping = load_camera_view_map(args.cluster_map, cluster_ids)
     enriched = apply_camera_views(annotations, shots, mapping)
-    args.output.write_text(json.dumps(enriched, indent=2) + "\\n", encoding="utf-8")
+    args.output.write_text(json.dumps(enriched, indent=2) + "\n", encoding="utf-8")
     print(f"Tagged {len(enriched['frames'])} frames using reviewed shot clusters")
 
 
