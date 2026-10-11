@@ -174,6 +174,19 @@ def _export_cvat(args: argparse.Namespace) -> None:
     print(json.dumps({"cvat_archive": str(args.output), **report}, indent=2))
 
 
+def _import_cvat(args: argparse.Namespace) -> None:
+    """Convert manually reviewed CVAT COCO labels into evaluation GT."""
+    from badminton_analysis.evaluation.cvat_import import convert_reviewed_cvat
+
+    report = convert_reviewed_cvat(
+        args.coco,
+        args.annotations,
+        args.output,
+        confirmed_reviewed=args.confirm_reviewed,
+    )
+    print(json.dumps({"ground_truth": str(args.output), **report}, indent=2))
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     subcommands = parser.add_subparsers(dest="command", required=True)
@@ -248,6 +261,20 @@ def main() -> None:
     cvat.add_argument("--images", type=Path, required=True)
     cvat.add_argument("--output", type=Path, required=True)
     cvat.set_defaults(handler=_export_cvat)
+
+    cvat_import = subcommands.add_parser(
+        "import-cvat",
+        help="Convert human-reviewed CVAT COCO labels into ground truth JSON and masks",
+    )
+    cvat_import.add_argument("--coco", type=Path, required=True)
+    cvat_import.add_argument("--annotations", type=Path, required=True)
+    cvat_import.add_argument("--output", type=Path, required=True)
+    cvat_import.add_argument(
+        "--confirm-reviewed",
+        action="store_true",
+        help="Confirm a person reviewed every image and corrected all players",
+    )
+    cvat_import.set_defaults(handler=_import_cvat)
 
     args = parser.parse_args()
     args.handler(args)
