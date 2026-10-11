@@ -158,8 +158,26 @@ def run(args: argparse.Namespace) -> dict[str, object]:
         ) if override_file.exists() else {}
     )
 
+    allowed_views = set(args.camera_view) if args.camera_view else None
+    eligible = [
+        i for i, shot in enumerate(shots)
+        if allowed_views is None or (
+            view_overrides.get(
+                shot.shot_id, view_mapping[str(labels[i])]
+            ) in allowed_views
+        )
+    ]
+    if not eligible:
+        raise ValueError(
+            "No shots match --camera-view. Review cluster_camera_views.json "
+            "and optional shot_view_overrides.json first."
+        )
     selected = select_cluster_frames(
-        shots, labels, sample_indices, target=args.frames, seed=args.seed
+        [shots[i] for i in eligible],
+        labels[eligible],
+        [sample_indices[i] for i in eligible],
+        target=args.frames,
+        seed=args.seed,
     )
     indices = {int(sample["frame_index"]) for sample in selected}
     # Hold out entire shots, not nearby frames, to avoid evaluation leakage.
@@ -259,6 +277,7 @@ def run(args: argparse.Namespace) -> dict[str, object]:
         "video_frames": count,
         "fps": fps,
         "total_shots": len(shots),
+        "eligible_shots": len(eligible),
         "visual_clusters": len(set(int(label) for label in labels)),
         "silhouette": silhouette,
         "exported_frames": len(records),
@@ -295,6 +314,10 @@ def main() -> None:
     parser.add_argument("--threshold", type=float, default=0.5)
     parser.add_argument("--clusters", type=int, default=6)
     parser.add_argument("--frames", type=int, default=150)
+    parser.add_argument("--camera-view", action="append", choices=[
+        "wide", "partial_court", "closeup", "side_angle",
+        "transition", "other", "needs_review",
+    ], help="Select only shots with this reviewed view; repeat for multiple views")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--max-shots", type=int,
                         help="Smoke test on the earliest N shots only")
