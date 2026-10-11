@@ -1,0 +1,40 @@
+name: BFMD benchmark tests
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/bfmd-benchmark.yml'
+      - 'scripts/prepare_bfmd.py'
+      - 'src/badminton_analysis/evaluation/**'
+      - 'tests/test_bfmd.py'
+      - 'tests/test_camera_views.py'
+      - 'tests/test_player_evaluation.py'
+      - 'tests/test_shot_clustering.py'
+  push:
+    branches:
+      - feat/m1-player-segmentation-benchmark
+
+jobs:
+  test-bfmd-benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install lightweight evaluation requirements
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pytest 'numpy>=2,<3' 'scipy>=1.12' 'scikit-learn>=1.5' 'opencv-python-headless>=4.10'
+      - name: Compile Python sources
+        run: python -m compileall -q src/badminton_analysis/evaluation scripts/prepare_bfmd.py
+      - name: Execute model-free benchmark tests
+        env:
+          PYTHONPATH: src:.
+        run: |
+          python -m pytest -q \
+            tests/test_player_evaluation.py \
+            tests/test_camera_views.py \
+            tests/test_shot_clustering.py \
+            tests/test_bfmd.py
