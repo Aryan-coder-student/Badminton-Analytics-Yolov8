@@ -6,6 +6,8 @@ from tempfile import TemporaryDirectory
 import unittest
 
 import cv2
+import numpy as np
+from pycocotools import mask as mask_utils
 
 from badminton_analysis.evaluation.cvat_import import convert_reviewed_cvat
 from badminton_analysis.evaluation.players import load_frames
@@ -64,6 +66,41 @@ class CvatImportTests(unittest.TestCase):
             self.assertEqual(mask.shape, (30, 40))
             self.assertTrue(mask[10, 12])
             self.assertFalse(mask[0, 0])
+
+    def test_compressed_coco_rle_preserves_mask_holes(self) -> None:
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            src = root / "selected.json"
+            src.write_text(json.dumps({
+                "frames": [{"frame_index": 25, "players": [], "split": "holdout"}]
+            }))
+            mask = np.zeros((30, 40), dtype=np.uint8)
+            mask[3:20, 5:25] = 1
+            mask[8:13, 10:16] = 0
+            encoded = mask_utils.encode(np.asfortranarray(mask))
+            coco = root / "reviewed.json"
+            coco.write_text(json.dumps({
+                "images": [{
+                    "id": 1, "file_name": "frame_00000025.png",
+                    "width": 40, "height": 30,
+                }],
+                "categories": [{"id": 1, "name": "player"}],
+                "annotations": [{
+                    "id": 3, "image_id": 1, "category_id": 1,
+                    "bbox": [5, 3, 20, 17], "iscrowd": 1,
+                    "segmentation": {
+                        "size": [30, 40],
+                        "counts": encoded["counts"].decode("ascii"),
+                    },
+                }],
+            }))
+            output = root / "ground_truth.json"
+            result = convert_reviewed_cvat(
+                coco, src, output, confirmed_reviewed=True
+            )
+            self.assertEqual(result["masks"], 1)
+            loaded_mask = load_frames(output)[0].players[0].mask
+            np.testing.assert_array_equal(loaded_mask, mask.astype(bool))
 
     def test_missing_selected_image_rejected(self) -> None:
         with TemporaryDirectory() as directory:
