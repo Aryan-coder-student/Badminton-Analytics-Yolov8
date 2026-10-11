@@ -107,8 +107,8 @@ data/benchmark/bfmd/<match>/
   shot_embeddings.npz              # 25/50/75 samples + DINOv2 means
   shot_clusters.csv                # labels + exact shot/sample provenance
   cluster_camera_views.json        # all needs_review until inspected
-  candidate_frames.csv             # selected frame paths, shot/cluster, court hint
-  images/frame_XXXXXXXX.jpg        # full original frames for manual labels
+  candidate_frames.csv             # selected paths, shot/cluster, view, split, court hint
+  images/frame_XXXXXXXX.png        # lossless full frames for manual masks
   court_roi_previews/              # only when time-nearby usable court corners
   cluster_review/cluster_XX.jpg    # contact sheets for reviewing clusters
   annotations_PRELABELS_NOT_GROUND_TRUTH.json
@@ -131,9 +131,16 @@ truth or report model accuracy against it.
 Review cluster contact sheets and replace
 `cluster_camera_views.json` values with actual semantic labels
 (`wide`, `partial_court`, `closeup`, `side_angle`, `transition`,
-`other`, `needs_review`). For any visually mixed cluster, use per-shot
-overrides using the command described in
+`other`, `needs_review`). Rerunning the script reuses this reviewed map.
+For any visually mixed cluster, create `shot_view_overrides.json` in
+the same output directory, keyed by shot IDs; the runner applies the
+shot-level overrides on rerun. See the format in
 [shot-camera-view-clustering.md](shot-camera-view-clustering.md).
+
+The script marks ~20% of unique sampled **shot IDs** as `holdout`, so
+multiple frames from one shot cannot end up in different splits. The
+remaining frames are `development`. This is for annotation/evaluation
+splitting, not a claim of independent BFMD match-level generalization.
 
 Then manually correct player boxes and draw segmentation masks in your
 annotation tool, separately maintain a shot-held-out validation set, and
