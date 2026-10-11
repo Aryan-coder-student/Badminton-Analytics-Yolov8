@@ -63,6 +63,19 @@ absolute video frame indices. The `mask_path` is relative to the JSON directory;
 mask foreground pixels must be nonzero and backgrounds zero. Omit `mask_path`
 until masks have been manually labelled.
 
+## Reuse existing camera-view clustering instead of relabelling views
+
+The project's established pipeline uses TransNetV2 shot boundaries, three
+25/50/75% frames per shot, averaged DINOv2 embeddings, and KMeans. **Do not
+create a second supervised camera-view model** for this milestone.
+See [shot-camera-view-clustering.md](shot-camera-view-clustering.md) for
+reproducible commands and how to reuse already-cached shot clusters.
+
+Review representative shots from each visual cluster once to establish
+meaningful view categories. A cluster label is not semantic ground truth;
+ambiguous clusters and individual camera-view exceptions need per-shot
+review. Keep player-box/mask annotation as a separate manual task.
+
 ## Step 1: Predict with existing YOLO segmentation
 
 ```bash
