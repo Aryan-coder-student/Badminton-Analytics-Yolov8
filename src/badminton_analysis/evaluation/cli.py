@@ -86,6 +86,39 @@ def _evaluate(args: argparse.Namespace) -> None:
         print(report_json, end="")
 
 
+
+def _camera_view_template(args: argparse.Namespace) -> None:
+    from badminton_analysis.evaluation.camera_views import (
+        camera_view_template,
+        load_shot_clusters,
+    )
+
+    template = camera_view_template(load_shot_clusters(args.shot_clusters))
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    args.output.write_text(json.dumps(template, indent=2) + "\\n", encoding="utf-8")
+    print(f"Review the camera views for {len(template)} visual clusters: {args.output}")
+
+
+def _apply_camera_views(args: argparse.Namespace) -> None:
+    from badminton_analysis.evaluation.camera_views import (
+        apply_camera_views,
+        load_camera_view_map,
+        load_shot_clusters,
+    )
+
+    # Masks are stored relative to the annotation manifest directory.
+    if args.output.resolve().parent != args.annotations.resolve().parent:
+        raise ValueError("Keep output JSON beside annotations to preserve relative mask paths")
+    load_frames(args.annotations)
+    annotations = json.loads(args.annotations.read_text(encoding="utf-8"))
+    shots = load_shot_clusters(args.shot_clusters)
+    cluster_ids = {str(shot["cluster_id"]) for shot in shots}
+    mapping = load_camera_view_map(args.cluster_map, cluster_ids)
+    enriched = apply_camera_views(annotations, shots, mapping)
+    args.output.write_text(json.dumps(enriched, indent=2) + "\\n", encoding="utf-8")
+    print(f"Tagged {len(enriched['frames'])} frames using reviewed shot clusters")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     subcommands = parser.add_subparsers(dest="command", required=True)
@@ -113,6 +146,24 @@ def main() -> None:
     evaluate.add_argument("--output", type=Path)
     evaluate.add_argument("--iou-threshold", type=float, default=0.5)
     evaluate.set_defaults(handler=_evaluate)
+
+    template = subcommands.add_parser(
+        "camera-view-template",
+        help="Create a needs_review map for existing shot cluster IDs",
+    )
+    template.add_argument("--shot-clusters", type=Path, required=True)
+    template.add_argument("--output", type=Path, required=True)
+    template.set_defaults(handler=_camera_view_template)
+
+    apply_views = subcommands.add_parser(
+        "camera-views",
+        help="Attach reviewed shot-cluster camera views to existing annotations",
+    )
+    apply_views.add_argument("--shot-clusters", type=Path, required=True)
+    apply_views.add_argument("--cluster-map", type=Path, required=True)
+    apply_views.add_argument("--annotations", type=Path, required=True)
+    apply_views.add_argument("--output", type=Path, required=True)
+    apply_views.set_defaults(handler=_apply_camera_views)
 
     args = parser.parse_args()
     args.handler(args)
