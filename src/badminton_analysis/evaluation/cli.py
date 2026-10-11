@@ -104,6 +104,7 @@ def _apply_camera_views(args: argparse.Namespace) -> None:
         apply_camera_views,
         load_camera_view_map,
         load_shot_clusters,
+        load_shot_view_overrides,
     )
 
     # Masks are stored relative to the annotation manifest directory.
@@ -114,7 +115,14 @@ def _apply_camera_views(args: argparse.Namespace) -> None:
     shots = load_shot_clusters(args.shot_clusters)
     cluster_ids = {str(shot["cluster_id"]) for shot in shots}
     mapping = load_camera_view_map(args.cluster_map, cluster_ids)
-    enriched = apply_camera_views(annotations, shots, mapping)
+    overrides = (
+        load_shot_view_overrides(
+            args.shot_overrides,
+            {str(shot["shot_id"]) for shot in shots},
+        )
+        if args.shot_overrides is not None else None
+    )
+    enriched = apply_camera_views(annotations, shots, mapping, overrides)
     args.output.write_text(json.dumps(enriched, indent=2) + "\n", encoding="utf-8")
     print(f"Tagged {len(enriched['frames'])} frames using reviewed shot clusters")
 
@@ -195,6 +203,7 @@ def main() -> None:
     )
     apply_views.add_argument("--shot-clusters", type=Path, required=True)
     apply_views.add_argument("--cluster-map", type=Path, required=True)
+    apply_views.add_argument("--shot-overrides", type=Path)
     apply_views.add_argument("--annotations", type=Path, required=True)
     apply_views.add_argument("--output", type=Path, required=True)
     apply_views.set_defaults(handler=_apply_camera_views)
