@@ -10,6 +10,7 @@ from badminton_analysis.evaluation.camera_views import (
     camera_view_template,
     load_camera_view_map,
     load_shot_clusters,
+    load_shot_view_overrides,
 )
 
 
@@ -80,6 +81,40 @@ class CameraViewClusterTests(unittest.TestCase):
                 {"frames": [{"frame_index": 300, "players": []}]},
                 self.shots, {"5": "closeup"},
             )
+
+    def test_manual_shot_override_preserves_other_cluster_labels(self) -> None:
+        annotations = {"frames": [
+            {"frame_index": 123, "players": []},
+            {"frame_index": 201, "players": []},
+        ]}
+        output = apply_camera_views(
+            annotations,
+            self.shots,
+            {"2": "wide", "5": "closeup"},
+            shot_overrides={"18": "side_angle"},
+        )
+        self.assertEqual(
+            [frame["camera_view"] for frame in output["frames"]],
+            ["side_angle", "closeup"],
+        )
+        self.assertEqual(
+            [frame["camera_view_source"] for frame in output["frames"]],
+            ["shot_override", "reviewed_cluster"],
+        )
+
+    def test_override_json_rejects_unknown_shot_and_invalid_view(self) -> None:
+        path = Path(self.temp.name) / "overrides.json"
+        path.write_text(json.dumps({"unknown": "wide"}))
+        with self.assertRaisesRegex(ValueError, "Unknown shot_id"):
+            load_shot_view_overrides(path, {"18", "23"})
+        path.write_text(json.dumps({"18": "FOO"}))
+        with self.assertRaisesRegex(ValueError, "Invalid camera view"):
+            load_shot_view_overrides(path, {"18", "23"})
+        path.write_text(json.dumps({"18": "partial_court"}))
+        self.assertEqual(
+            load_shot_view_overrides(path, {"18", "23"}),
+            {"18": "partial_court"},
+        )
 
     def test_overlapping_shots_rejected(self) -> None:
         self.csv.write_text(
