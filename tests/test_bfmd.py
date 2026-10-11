@@ -2,9 +2,12 @@
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 from tempfile import TemporaryDirectory
 import unittest
 
+import cv2
 import numpy as np
 
 from badminton_analysis.evaluation.bfmd import (
@@ -16,7 +19,10 @@ from badminton_analysis.evaluation.bfmd import (
     scenes_to_shots,
     select_cluster_frames,
 )
-from badminton_analysis.evaluation.shot_clustering import ShotRange
+from badminton_analysis.evaluation.shot_clustering import (
+    ShotRange,
+    save_embedding_cache,
+)
 
 
 class BfmdTests(unittest.TestCase):
@@ -84,6 +90,74 @@ class BfmdTests(unittest.TestCase):
         self.assertEqual(
             {entry["cluster_id"] for entry in selected}, {0, 1, 2}
         )
+
+    def test_bfmd_runner_with_cached_embeddings_extracts_real_pngs(self) -> None:
+        from scripts.prepare_bfmd import run
+
+        with TemporaryDirectory() as directory:
+            root = Path(directory) / "BFMD_data"
+            videos = root / "videos_doubles"
+            videos.mkdir(parents=True)
+            video = videos / "Sample-Match.mp4"
+            writer = cv2.VideoWriter(
+                str(video), cv2.VideoWriter_fourcc(*"mp4v"),
+                30.0, (1280, 720),
+            )
+            if not writer.isOpened():
+                self.skipTest("OpenCV video writer cannot encode mp4v")
+            for n in range(30):
+                frame = np.full((720, 1280, 3), 100 + n, dtype=np.uint8)
+                writer.write(frame)
+            writer.release()
+
+            out = Path(directory) / "prepared"
+            out.mkdir()
+            shots = [ShotRange("1", 0, 15), ShotRange("2", 15, 30)]
+            csv_file = out / "shot_ranges.csv"
+            csv_file.write_text(
+                "shot_id,start_frame,end_frame\n1,0,15\n2,15,30\n"
+            )
+            sample_indices = [(3, 7, 10), (18, 22, 25)]
+            save_embedding_cache(
+                out / "shot_embeddings.npz",
+                shots,
+                np.asarray([[1.0, 0.0], [0.0, 1.0]], dtype=np.float32),
+                sample_indices,
+            )
+            args = SimpleNamespace(
+                bfmd_root=root, match="Sample-Match", video=None,
+                output=out, shot_ranges=csv_file, transnet_weights=None,
+                threshold=0.5, clusters=2, frames=4, seed=42,
+                max_shots=None, redetect=False, reembed=False,
+                allow_video_mismatch=False, camera_view=None,
+            )
+            with patch(
+                "scripts.prepare_bfmd.group_shots",
+                return_value=(np.asarray([0, 1]), 0.4),
+            ):
+                report = run(args)
+            self.assertEqual(report["exported_frames"], 4)
+            self.assertEqual(report["eligible_shots"], 2)
+            self.assertEqual(report["holdout_frames"], 2)
+            self.assertEqual(
+                len(list((out / "images").glob("*.png"))), 4
+            )
+            self.assertEqual(
+                len(list((out / "cluster_review").glob("*.jpg"))), 2
+            )
+            template = json.loads(
+                (out / "annotations_PRELABELS_NOT_GROUND_TRUTH.json").read_text()
+            )
+            self.assertTrue(
+                all(frame["annotation_status"] == "unlabelled"
+                    for frame in template["frames"])
+            )
+            self.assertTrue(
+                all(not frame["players"] for frame in template["frames"])
+            )
+            self.assertTrue(
+                (out / "cluster_camera_views.json").exists()
+            )
 
     def test_pose_box_prelabels_must_still_be_reviewed(self) -> None:
         with TemporaryDirectory() as directory:
