@@ -169,6 +169,50 @@ annotation tool, separately maintain a shot-held-out validation set, and
 use the existing `evaluation.cli evaluate` command. Without that manual
 verification, **Milestone 1 detector accuracy cannot be claimed**.
 
+## Prelabel players and export a CVAT annotation task
+
+After extracting BFMD candidate PNG frames, use the existing YOLO11
+segmentation adapter to propose each visible person and its mask. These
+predictions have **not** been court-filtered and will include occasional
+spectators/officials, duplicate players, and missing players. They must be
+corrected in CVAT; never evaluate YOLO against its own prelabels.
+
+```bash
+# Full candidate frame set, including every sampled image:
+MATCH_DIR=data/benchmark/bfmd/<match>
+
+uv run python -m badminton_analysis.evaluation.cli predict \
+  --video BFMD_data/videos_doubles/<match>.mp4 \
+  --annotations "$MATCH_DIR/annotations_PRELABELS_NOT_GROUND_TRUTH.json" \
+  --output "$MATCH_DIR/yolo_predictions.json" \
+  --confidence 0.1
+
+# Export the frames and proposed boxes/masks as CVAT COCO 1.0:
+uv run python -m badminton_analysis.evaluation.cli export-cvat \
+  --annotations "$MATCH_DIR/annotations_PRELABELS_NOT_GROUND_TRUTH.json" \
+  --predictions "$MATCH_DIR/yolo_predictions.json" \
+  --images "$MATCH_DIR/images" \
+  --output "$MATCH_DIR/cvat_UNVERIFIED_prelabels.zip"
+```
+
+Replace the <match> placeholder with the actual BFMD video stem and match
+path. For singles videos, use the actual nested path under `videos/`.
+The YOLO `predict` command runs from the full source video using exact
+absolute frame indices, matching the previously extracted PNG frame names.
+
+Import this ZIP into a CVAT task using the COCO 1.0 dataset import workflow.
+The `player` category is a **candidate** for manual review. Review
+**every** image, remove off-court people, add missing players, correct tight
+XYXY boxes and visible-body masks, and confirm genuine negative frames.
+The polygons are generated from external mask contours; holes may not
+survive COCO polygon conversion and must be manually corrected. Keep the
+separate frame/shot-based holdout split when evaluating.
+
+CVAT reviewed annotations must later be converted back into the benchmark's
+original-pixel XYXY + full-frame mask format. The CVAT export from this PR
+is preparation for that human review step; it does **not** assert a completed
+ground-truth dataset.
+
 ## Status
 
 This PR contains an executable adapter with pure data handling tests.
