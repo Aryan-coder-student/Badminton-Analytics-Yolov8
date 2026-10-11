@@ -1,5 +1,22 @@
 # Project Work Log
 
+## 2026-10-11 — Reuse shot-cut extraction and visual clustering for camera-view prelabels
+
+- Confirmed the existing camera-shot pipeline: TransNetV2 boundaries, 25/50/75%
+  frame samples, one DINOv2 embedding per frame, per-shot averaging, and KMeans.
+  The recorded 1,431-frame experiment found six unsupervised visual clusters
+  (silhouette 0.207529); these are **not** verified semantic camera labels.
+- Added a tracked, reusable shot-range -> three-percentile sampling -> DINOv2
+  embedding cache -> existing Cluster("kmeans") -> shot-cluster CSV path.
+  The pipeline accepts exported shot boundaries rather than duplicating the
+  existing TransNetV2 boundary detector in Git-ignored scratchpad code.
+- Integrated human-reviewed cluster-to-view mapping with optional per-shot
+  overrides; all player boxes/masks and their frame indices remain unchanged.
+- Added focused tests for sampling, cache round trips, boundary validation,
+  cluster metadata, and shot overrides. A synthetic video smoke test passed
+  locally for the shot-embedding/cache component. End-to-end model metrics
+  remain unmeasured until source video and labels are available.
+
 ## 2026-10-11 — Milestone 1 player detection/segmentation benchmark groundwork
 
 - Added a model-independent benchmark with one-to-one IoU matching and
