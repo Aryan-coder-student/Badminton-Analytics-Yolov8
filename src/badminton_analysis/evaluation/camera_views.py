@@ -89,10 +89,28 @@ def camera_view_template(shots: list[dict[str, str | int]]) -> dict[str, str]:
     }
 
 
+
+def load_shot_view_overrides(
+    path: Path,
+    known_shot_ids: set[str],
+) -> dict[str, str]:
+    """Load optional shot-specific corrections to a reviewed cluster label."""
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise ValueError("Shot overrides must be an object keyed by shot_id")
+    for shot_id, view in data.items():
+        if shot_id not in known_shot_ids:
+            raise ValueError(f"Unknown shot_id in overrides: {shot_id}")
+        if not isinstance(view, str) or view not in CAMERA_VIEWS:
+            raise ValueError(f"Invalid camera view override for shot {shot_id}")
+    return data
+
+
 def apply_camera_views(
     annotation_data: dict[str, object],
     shots: list[dict[str, str | int]],
     mapping: dict[str, str],
+    shot_overrides: dict[str, str] | None = None,
 ) -> dict[str, object]:
     """Decorate labelled frame records with shot, cluster, and reviewed view.
 
@@ -102,6 +120,12 @@ def apply_camera_views(
     frames = annotation_data.get("frames")
     if not isinstance(frames, list):
         raise ValueError("Annotation JSON must contain a frames list")
+    overrides = shot_overrides or {}
+    known_shots = {str(shot["shot_id"]) for shot in shots}
+    if unknown := set(overrides) - known_shots:
+        raise ValueError(f"Unknown shot IDs in overrides: {sorted(unknown)}")
+    if any(view not in CAMERA_VIEWS for view in overrides.values()):
+        raise ValueError("Invalid camera view in shot overrides")
     output_frames: list[dict[str, object]] = []
     for frame in frames:
         if not isinstance(frame, dict) or type(frame.get("frame_index")) is not int:
@@ -117,7 +141,9 @@ def apply_camera_views(
         cluster_id = str(shot["cluster_id"])
         if cluster_id not in mapping:
             raise ValueError(f"Unmapped visual cluster: {cluster_id}")
-        view = mapping[cluster_id]
+        shot_id = str(shot["shot_id"])
+        view = overrides.get(shot_id, mapping[cluster_id])
+        view_source = "shot_override" if shot_id in overrides else "reviewed_cluster"
         original_view = frame.get("camera_view")
         if original_view not in (None, "unknown", "needs_review", view):
             raise ValueError(
@@ -129,5 +155,6 @@ def apply_camera_views(
             "shot_id": shot["shot_id"],
             "visual_cluster_id": cluster_id,
             "camera_view": view,
+            "camera_view_source": view_source,
         })
     return {**annotation_data, "frames": output_frames}
