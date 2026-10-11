@@ -94,8 +94,6 @@ def convert_reviewed_cvat(
             raise ValueError(f"Annotation points to unknown COCO image {image_id}")
         if item["category_id"] not in categories:
             raise ValueError("Unknown COCO player category_id")
-        if item.get("iscrowd", 0):
-            raise ValueError("COCO crowd/RLE annotations are not supported")
         frame_index, width, height = images[image_id]
         coords = item["bbox"]
         if len(coords) != 4 or not all(np.isfinite(float(v)) for v in coords):
@@ -104,22 +102,33 @@ def convert_reviewed_cvat(
         if x < 0 or y < 0 or w <= 0 or h <= 0 or x + w > width or y + h > height:
             raise ValueError(f"Out-of-frame bbox on frame {frame_index}")
         label: dict[str, object] = {"bbox": [x, y, x + w, y + h]}
-        polygons = item.get("segmentation", [])
-        if polygons:
-            if not isinstance(polygons, list):
-                raise ValueError(
-                    "RLE/compressed segmentation requires conversion to polygons"
-                )
-            mask = np.zeros((height, width), dtype=np.uint8)
-            valid_polygons = []
-            for polygon in polygons:
-                if len(polygon) < 6 or len(polygon) % 2:
-                    raise ValueError("Malformed COCO player polygon")
-                vertices = np.asarray(polygon, dtype=float).reshape(-1, 2)
-                if not np.isfinite(vertices).all():
-                    raise ValueError("Non-finite COCO polygon")
-                valid_polygons.append(np.rint(vertices).astype(np.int32))
-            cv2.fillPoly(mask, valid_polygons, 255)
+        segmentation = item.get("segmentation", [])
+        if segmentation:
+            if isinstance(segmentation, dict):
+                # CVAT COCO exports genuine masks as compressed or uncompressed
+                # COCO RLE. Decode at native resolution; do not polygonize.
+                from pycocotools import mask as mask_utils
+
+                rle = segmentation
+                if isinstance(rle.get("counts"), list):
+                    rle = mask_utils.frPyObjects(rle, height, width)
+                mask = np.asarray(mask_utils.decode(rle), dtype=np.uint8)
+                if mask.shape != (height, width):
+                    raise ValueError("COCO RLE shape differs from source frame")
+                mask = (mask > 0).astype(np.uint8) * 255
+            elif isinstance(segmentation, list):
+                mask = np.zeros((height, width), dtype=np.uint8)
+                valid_polygons = []
+                for polygon in segmentation:
+                    if len(polygon) < 6 or len(polygon) % 2:
+                        raise ValueError("Malformed COCO player polygon")
+                    vertices = np.asarray(polygon, dtype=float).reshape(-1, 2)
+                    if not np.isfinite(vertices).all():
+                        raise ValueError("Non-finite COCO polygon")
+                    valid_polygons.append(np.rint(vertices).astype(np.int32))
+                cv2.fillPoly(mask, valid_polygons, 255)
+            else:
+                raise ValueError("Unsupported COCO segmentation encoding")
             if not np.any(mask):
                 raise ValueError("Empty COCO player mask")
             name = f"frame_{frame_index:08d}_player_{len(players[frame_index]):02d}.png"
