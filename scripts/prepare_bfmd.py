@@ -10,6 +10,7 @@ This script does not download or redistribute copyrighted BWF TV recordings.
 import argparse
 import csv
 import json
+import random
 from pathlib import Path
 
 import cv2
@@ -25,7 +26,11 @@ from badminton_analysis.evaluation.bfmd import (
     scenes_to_shots,
     select_cluster_frames,
 )
-from badminton_analysis.evaluation.camera_views import camera_view_template
+from badminton_analysis.evaluation.camera_views import (
+    camera_view_template,
+    load_camera_view_map,
+    load_shot_view_overrides,
+)
 from badminton_analysis.evaluation.shot_clustering import (
     extract_shot_embeddings,
     group_shots,
@@ -144,11 +149,25 @@ def run(args: argparse.Namespace) -> dict[str, object]:
             ]), indent=2) + "\n",
             encoding="utf-8",
         )
+    cluster_ids = {str(label) for label in labels}
+    view_mapping = load_camera_view_map(camera_map, cluster_ids)
+    override_file = out / "shot_view_overrides.json"
+    view_overrides = (
+        load_shot_view_overrides(
+            override_file, {shot.shot_id for shot in shots}
+        ) if override_file.exists() else {}
+    )
 
     selected = select_cluster_frames(
         shots, labels, sample_indices, target=args.frames, seed=args.seed
     )
     indices = {int(sample["frame_index"]) for sample in selected}
+    # Hold out entire shots, not nearby frames, to avoid evaluation leakage.
+    shot_ids = sorted({str(item["shot_id"]) for item in selected})
+    shuffled = list(shot_ids)
+    random.Random(args.seed).shuffle(shuffled)
+    holdout_count = max(1, round(len(shuffled) * 0.2)) if len(shuffled) > 1 else 0
+    holdout_shots = set(shuffled[:holdout_count])
     court_path = root / "annotations" / "court_perframe" / f"{match}.json"
     court_hints = read_court_hints(court_path) if use_annotations else []
     pose_path = root / "annotations" / "pose" / f"{match}.json"
@@ -170,7 +189,7 @@ def run(args: argparse.Namespace) -> dict[str, object]:
             ok, frame = reader.read()
             if not ok:
                 raise ValueError(f"Cannot decode BFMD frame {index}")
-            frame_name = f"frame_{index:08d}.jpg"
+            frame_name = f"frame_{index:08d}.png"
             image_path = images / frame_name
             if not cv2.imwrite(str(image_path), frame):
                 raise ValueError(f"Cannot save frame {index}")
@@ -183,8 +202,19 @@ def run(args: argparse.Namespace) -> dict[str, object]:
                 if not cv2.imwrite(str(crop_path), frame[y1:y2, x1:x2]):
                     raise ValueError(f"Cannot save court preview {index}")
                 roi_path = str(crop_path.relative_to(out))
+            shot_id = str(sample["shot_id"])
+            view = view_overrides.get(
+                shot_id, view_mapping[str(sample["cluster_id"])]
+            )
+            view_source = (
+                "shot_override" if shot_id in view_overrides
+                else "reviewed_cluster"
+            )
             item = {
                 **sample,
+                "split": "holdout" if shot_id in holdout_shots else "development",
+                "camera_view": view,
+                "camera_view_source": view_source,
                 "image_path": str(image_path.relative_to(out)),
                 "court_roi_preview": roi_path,
                 "court_flag_hint": str(hint.get("flag")) if hint else "unknown",
@@ -199,7 +229,9 @@ def run(args: argparse.Namespace) -> dict[str, object]:
                 "frame_index": index,
                 "shot_id": sample["shot_id"],
                 "visual_cluster_id": str(sample["cluster_id"]),
-                "camera_view": "needs_review",
+                "camera_view": view,
+                "camera_view_source": view_source,
+                "split": item["split"],
                 "annotation_status": item["annotation_status"],
                 "players": pose_prelabels.get(index, []),
             })
@@ -232,7 +264,10 @@ def run(args: argparse.Namespace) -> dict[str, object]:
         "exported_frames": len(records),
         "prelabelled_frames": len(pose_prelabels),
         "court_hint_frames_available": bool(court_hints),
-        "camera_views_verified": False,
+        "camera_views_verified": all(
+            item["camera_view"] != "needs_review" for item in records
+        ),
+        "holdout_frames": sum(item["split"] == "holdout" for item in records),
         "player_ground_truth_verified": False,
         "reminder": (
             "Cluster IDs are visual groups, not camera labels. BFMD pose boxes "
