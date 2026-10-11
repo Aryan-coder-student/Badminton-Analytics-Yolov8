@@ -208,10 +208,30 @@ The polygons are generated from external mask contours; holes may not
 survive COCO polygon conversion and must be manually corrected. Keep the
 separate frame/shot-based holdout split when evaluating.
 
-CVAT reviewed annotations must later be converted back into the benchmark's
-original-pixel XYXY + full-frame mask format. The CVAT export from this PR
-is preparation for that human review step; it does **not** assert a completed
-ground-truth dataset.
+After manually correcting all images in CVAT, export the reviewed task
+as COCO 1.0 (JSON or ZIP). Then run:
+
+```bash
+uv run python -m badminton_analysis.evaluation.cli import-cvat \
+  --coco "$MATCH_DIR/cvat_REVIEWED.zip" \
+  --annotations "$MATCH_DIR/annotations_PRELABELS_NOT_GROUND_TRUTH.json" \
+  --output "$MATCH_DIR/annotations_GROUND_TRUTH.json" \
+  --confirm-reviewed
+
+uv run python -m badminton_analysis.evaluation.cli evaluate \
+  --annotations "$MATCH_DIR/annotations_GROUND_TRUTH.json" \
+  --predictions "$MATCH_DIR/yolo_predictions.json" \
+  --output "$MATCH_DIR/player_metrics.json"
+```
+
+The converter uses exact full-resolution pixels, creates instance-mask PNGs
+from reviewed polygons, and preserves frame indices, camera-view labels,
+shot IDs, and development/holdout splits. It rejects dropped frames,
+unrecognized classes, out-of-bounds boxes and unsupported RLE masks, rather
+than silently corrupting ground truth. If you only corrected boxes, mask-IoU
+is unavailable for those instances. The `--confirm-reviewed` flag is a
+declaration from the annotator, not automatic verification. Never pass a
+machine-generated prelabel ZIP as reviewed ground truth.
 
 ## Status
 
