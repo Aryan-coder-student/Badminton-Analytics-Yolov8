@@ -94,6 +94,28 @@ uv run python scripts/prepare_bfmd.py \
 The CSV must have `shot_id,start_frame,end_frame` with **end exclusive**
 and absolute video frame indices.
 
+After reviewing `cluster_review/*.jpg`, map cluster IDs to semantic views in
+`cluster_camera_views.json`. To prepare just the **wide-court region/view**
+for player segmentation, rerun in a **separate output directory**
+(preventing an older mixed-view review sheet from being mistaken for current):
+
+```bash
+uv run python scripts/prepare_bfmd.py \
+  --bfmd-root BFMD_data \
+  --match "<unique-match-fragment>" \
+  --shot-ranges data/benchmark/bfmd/<match>/shot_ranges.csv \
+  --camera-view wide \
+  --frames 150 \
+  --output data/benchmark/bfmd/<match>_wide
+```
+
+Copy the already-reviewed `cluster_camera_views.json` to that output
+directory first. To reuse embeddings without recomputation, also copy the
+validated `shot_embeddings.npz` for the same full shot ranges. The
+`--camera-view` option may be repeated. Because a shot-level view
+classification is not a verified court homography, BFMD court hints and
+manual review still determine whether a court ROI is suitable.
+
 For a smoke test use `--max-shots 12 --clusters 3 --frames 20`.
 Rerun with `--reembed` when input shots/video or embedding setup changes,
 and `--redetect` to replace cached boundaries. Avoid reusing an output
