@@ -1,5 +1,18 @@
 # Project Work Log
 
+## 2026-10-11 — BFMD evaluation CI and CVAT player-mask prelabels
+
+- Added GitHub Actions CI for the model-free frame evaluator, shot clustering,
+  BFMD integration and camera-view metadata, with light dependencies and
+  Python compilation checks. Initial workflow executions passed.
+- Added `evaluation/cvat.py` and `evaluation.cli export-cvat` to bundle
+  selected BFMD PNG frames, YOLO person boxes and mask-derived COCO polygons
+  into a CVAT-ready ZIP. All outputs are marked **unverified prelabels**.
+- Added deterministic mask polygon/ZIP export tests, integrated them into
+  the CI workflow, and documented the two commands following BFMD frame
+  selection. Manual correction is still required before detection benchmarking;
+  outer contours can omit interior mask holes, and raw YOLO includes spectators.
+
 ## 2026-10-11 — BFMD full-match adapter for Milestone 1
 
 - Added `scripts/prepare_bfmd.py` and `evaluation/bfmd.py` to use official
