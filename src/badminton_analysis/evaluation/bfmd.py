@@ -153,35 +153,36 @@ def select_cluster_frames(
         chunks = [entries[i::10] for i in range(10)]
         rng.shuffle(chunks)
         entries[:] = [entry for chunk in chunks for entry in chunk]
-    candidates: dict[int, list[dict[str, object]]] = {}
+    first_pass: dict[int, list[dict[str, object]]] = {}
+    second_pass: dict[int, list[dict[str, object]]] = {}
     for group, entries in groups.items():
         first, extra = [], []
         for shot, indices in entries:
-            base = {
-                "shot_id": shot.shot_id,
-                "cluster_id": group,
-            }
-            first.append({**base, "frame_index": indices[len(indices) // 2]})
+            base = {"shot_id": shot.shot_id, "cluster_id": group}
+            middle = indices[len(indices) // 2]
+            first.append({**base, "frame_index": middle})
             extra.extend(
                 {**base, "frame_index": index}
-                for index in indices
-                if index != indices[len(indices) // 2]
+                for index in indices if index != middle
             )
-        candidates[group] = first + extra
+        first_pass[group] = first
+        second_pass[group] = extra
     selected: list[dict[str, object]] = []
-    offset = {group: 0 for group in candidates}
-    groups_in_order = sorted(candidates)
-    while len(selected) < target:
-        progressed = False
-        for group in groups_in_order:
-            if offset[group] < len(candidates[group]):
-                selected.append(candidates[group][offset[group]])
-                offset[group] += 1
-                progressed = True
-                if len(selected) == target:
-                    break
-        if not progressed:
-            break
+    # Exhaust different shots before selecting a second frame from any shot.
+    for pools in (first_pass, second_pass):
+        offsets = {group: 0 for group in pools}
+        groups_in_order = sorted(pools)
+        while len(selected) < target:
+            progressed = False
+            for group in groups_in_order:
+                if offsets[group] < len(pools[group]):
+                    selected.append(pools[group][offsets[group]])
+                    offsets[group] += 1
+                    progressed = True
+                    if len(selected) == target:
+                        break
+            if not progressed:
+                break
     selected.sort(key=lambda item: int(item["frame_index"]))
     return selected
 
