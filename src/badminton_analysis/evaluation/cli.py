@@ -161,6 +161,19 @@ def _cluster_shots(args: argparse.Namespace) -> None:
     )
 
 
+def _export_cvat(args: argparse.Namespace) -> None:
+    """Create CVAT's COCO zip from raw YOLO masks and the BFMD image selection."""
+    from badminton_analysis.evaluation.cvat import create_cvat_prelabels
+
+    report = create_cvat_prelabels(
+        args.annotations,
+        args.predictions,
+        args.images,
+        args.output,
+    )
+    print(json.dumps({"cvat_archive": str(args.output), **report}, indent=2))
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     subcommands = parser.add_subparsers(dest="command", required=True)
@@ -225,6 +238,16 @@ def main() -> None:
     cluster.add_argument("--clusters", type=int, default=6)
     cluster.add_argument("--output", type=Path, required=True)
     cluster.set_defaults(handler=_cluster_shots)
+
+    cvat = subcommands.add_parser(
+        "export-cvat",
+        help="Create a CVAT COCO ZIP of unverified YOLO player prelabels",
+    )
+    cvat.add_argument("--annotations", type=Path, required=True)
+    cvat.add_argument("--predictions", type=Path, required=True)
+    cvat.add_argument("--images", type=Path, required=True)
+    cvat.add_argument("--output", type=Path, required=True)
+    cvat.set_defaults(handler=_export_cvat)
 
     args = parser.parse_args()
     args.handler(args)
