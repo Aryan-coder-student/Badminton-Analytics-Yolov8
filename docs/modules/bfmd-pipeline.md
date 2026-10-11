@@ -225,9 +225,9 @@ uv run python -m badminton_analysis.evaluation.cli evaluate \
 ```
 
 The converter uses exact full-resolution pixels, creates instance-mask PNGs
-from reviewed polygons, and preserves frame indices, camera-view labels,
+from reviewed polygons or COCO RLE (including masks with holes), and preserves frame indices, camera-view labels,
 shot IDs, and development/holdout splits. It rejects dropped frames,
-unrecognized classes, out-of-bounds boxes and unsupported RLE masks, rather
+unrecognized classes, out-of-bounds boxes and malformed masks, rather
 than silently corrupting ground truth. If you only corrected boxes, mask-IoU
 is unavailable for those instances. The `--confirm-reviewed` flag is a
 declaration from the annotator, not automatic verification. Never pass a
