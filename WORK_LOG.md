@@ -1,5 +1,19 @@
 # Project Work Log
 
+## 2026-10-11 — Milestone 1 player detection/segmentation benchmark groundwork
+
+- Added a model-independent benchmark with one-to-one IoU matching and
+  precision/recall/F1, all-player frame coverage, four-player coverage, and
+  mask IoU. No identity or track association changes were made.
+- Added a CLI for raw YOLO person segmentation on selected labelled video
+  frames and full-size mask/JSON export. Court filtering remains in ignored
+  scratchpad code; raw YOLO scores are not equivalent to court-filtered scores.
+- Documented manual annotation selection, output format, and evaluation
+  commands. No fake ground-truth accuracy measurements were produced.
+- Validation: nine new isolated unit tests passed in a local test environment.
+  No full-match model inference or full repository test suite was run here;
+  match video and model checkpoints were unavailable.
+
 This file is the dated record of material project progress. Add new entries directly
 below this note in reverse chronological order. Record outcomes, verification,
 important decisions, and unfinished work rather than individual shell commands.
