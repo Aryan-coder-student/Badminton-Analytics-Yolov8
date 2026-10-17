@@ -1,5 +1,77 @@
 # Project Work Log
 
+## 2026-10-17 — Repository hygiene and dependency lock sync
+
+- Excluded the local BFMD dataset, model directory, and macOS metadata from Git.
+- Synchronized `uv.lock` with the existing `pycocotools` project dependency.
+- Kept datasets and model checkpoints local while preparing the branch for GitHub.
+
+## 2026-10-11 — BFMD evaluation CI and CVAT player-mask prelabels
+
+- Added GitHub Actions CI for the model-free frame evaluator, shot clustering,
+  BFMD integration and camera-view metadata, with light dependencies and
+  Python compilation checks. Initial workflow executions passed.
+- Added `evaluation/cvat.py` and `evaluation.cli export-cvat` to bundle
+  selected BFMD PNG frames, YOLO person boxes and mask-derived COCO polygons
+  into a CVAT-ready ZIP. All outputs are marked **unverified prelabels**.
+- Added deterministic mask polygon/ZIP export tests, integrated them into
+  the CI workflow, and documented the two commands following BFMD frame
+  selection. Manual correction is still required before detection benchmarking;
+  outer contours can omit interior mask holes, and raw YOLO includes spectators.
+
+## 2026-10-11 — BFMD full-match adapter for Milestone 1
+
+- Added `scripts/prepare_bfmd.py` and `evaluation/bfmd.py` to use official
+  BFMD single/doubles match paths while keeping copyrighted BWF TV videos
+  and downloaded dataset annotations outside Git.
+- The runner can detect scene cuts through `transnetv2-pytorch==1.0.5`
+  using provided pretrained weights, or reuse the existing TransNetV2
+  shot-range CSV and cached DINOv2 embeddings. It runs the already-existing
+  shot-level KMeans workflow and exports grouped contact sheets.
+- Added candidate selection distributed across clusters and the match,
+  prioritizing distinct camera shots; a shot-disjoint holdout split prevents
+  adjacent frames from the same shot leaking into both splits. Select
+  reviewed camera views with optional repeated `--camera-view` flags.
+- Frames are exported losslessly as PNG. BFMD court-per-frame hints create
+  optional **ROI previews** only, never cropped input to view embeddings.
+  Optional BFMD singles pose boxes are copied only as unverified prelabels;
+  doubles frames have no assumed player ground truth. No mask accuracy
+  or actual camera-view accuracy has been claimed.
+- Added synthetic-input and dataset-helper test cases and a BFMD runbook.
+  Real BFMD video/weights, actual full-match inference and the combined
+  test suite remain unverified in this environment.
+
+## 2026-10-11 — Reuse shot-cut extraction and visual clustering for camera-view prelabels
+
+- Confirmed the existing camera-shot pipeline: TransNetV2 boundaries, 25/50/75%
+  frame samples, one DINOv2 embedding per frame, per-shot averaging, and KMeans.
+  The recorded 1,431-frame experiment found six unsupervised visual clusters
+  (silhouette 0.207529); these are **not** verified semantic camera labels.
+- Added a tracked, reusable shot-range -> three-percentile sampling -> DINOv2
+  embedding cache -> existing Cluster("kmeans") -> shot-cluster CSV path.
+  The pipeline accepts exported shot boundaries rather than duplicating the
+  existing TransNetV2 boundary detector in Git-ignored scratchpad code.
+- Integrated human-reviewed cluster-to-view mapping with optional per-shot
+  overrides; all player boxes/masks and their frame indices remain unchanged.
+- Added focused tests for sampling, cache round trips, boundary validation,
+  cluster metadata, and shot overrides. A synthetic video smoke test passed
+  locally for the shot-embedding/cache component. End-to-end model metrics
+  remain unmeasured until source video and labels are available.
+
+## 2026-10-11 — Milestone 1 player detection/segmentation benchmark groundwork
+
+- Added a model-independent benchmark with one-to-one IoU matching and
+  precision/recall/F1, all-player frame coverage, four-player coverage, and
+  mask IoU. No identity or track association changes were made.
+- Added a CLI for raw YOLO person segmentation on selected labelled video
+  frames and full-size mask/JSON export. Court filtering remains in ignored
+  scratchpad code; raw YOLO scores are not equivalent to court-filtered scores.
+- Documented manual annotation selection, output format, and evaluation
+  commands. No fake ground-truth accuracy measurements were produced.
+- Validation: nine new isolated unit tests passed in a local test environment.
+  No full-match model inference or full repository test suite was run here;
+  match video and model checkpoints were unavailable.
+
 This file is the dated record of material project progress. Add new entries directly
 below this note in reverse chronological order. Record outcomes, verification,
 important decisions, and unfinished work rather than individual shell commands.
