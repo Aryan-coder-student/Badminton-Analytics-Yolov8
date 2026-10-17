@@ -1,5 +1,11 @@
 # Project Work Log
 
+## 2026-10-17 — Repository hygiene and dependency lock sync
+
+- Excluded the local BFMD dataset, model directory, and macOS metadata from Git.
+- Synchronized `uv.lock` with the existing `pycocotools` project dependency.
+- Kept datasets and model checkpoints local while preparing the branch for GitHub.
+
 ## 2026-10-11 — BFMD evaluation CI and CVAT player-mask prelabels
 
 - Added GitHub Actions CI for the model-free frame evaluator, shot clustering,
